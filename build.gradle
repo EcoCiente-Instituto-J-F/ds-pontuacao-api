@@ -9,7 +9,7 @@ version = '1.0.1'
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(19)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
@@ -18,14 +18,50 @@ repositories {
 }
 
 dependencies {
+	// API REST
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+
+	// Swagger / OpenAPI
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
 
-	compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	annotationProcessor 'org.projectlombok:lombok'
+	// Persistência no PostgreSQL
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	runtimeOnly 'org.postgresql:postgresql'
 
+	// Rankings no Redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	// Validação dos DTOs
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// Autenticação e autorização
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+
+	// Validação de tokens JWT recebidos pela API
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+	// Health checks e métricas
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// Lombok
+	compileOnly 'org.projectlombok:lombok:1.18.48'
+	annotationProcessor 'org.projectlombok:lombok:1.18.48'
+
+	// Desenvolvimento
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	// Testes unitários: JUnit e Mockito
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	// Testes de segurança
+	testImplementation 'org.springframework.security:spring-security-test'
+
+	// Testes de integração com containers
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'org.testcontainers:postgresql'
+	testImplementation 'org.testcontainers:testcontainers'
+
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
