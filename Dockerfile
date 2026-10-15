@@ -1,4 +1,4 @@
-FROM eclipse-temurin:19-jdk-jammy AS build
+FROM eclipse-temurin:21-jdk-jammy AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN JAR_FILE="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-pla
     && cp "$JAR_FILE" app.jar
 
 
-FROM eclipse-temurin:19-jre-jammy
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
