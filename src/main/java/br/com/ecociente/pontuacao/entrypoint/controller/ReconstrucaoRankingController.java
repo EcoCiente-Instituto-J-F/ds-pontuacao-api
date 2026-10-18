@@ -1,40 +1,39 @@
-
 package br.com.ecociente.pontuacao.entrypoint.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import br.com.ecociente.pontuacao.core.service.ReconstrucaoRankingService;
 import br.com.ecociente.pontuacao.core.service.ReconstrucaoRankingService.ResultadoReconstrucao;
 import br.com.ecociente.pontuacao.entrypoint.dto.request.ReconstruirRankingRequest;
-
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/admin/rankings")
-@RequiredArgsConstructor
 public class ReconstrucaoRankingController {
 
-  private final ReconstrucaoRankingService service;
+    private final ReconstrucaoRankingService service;
 
-  @PostMapping("/reconstruir")
-  @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<ResultadoReconstrucao> reconstruir(
-      @Valid @RequestBody ReconstruirRankingRequest request) {
-
-    if (!"ATUAL".equalsIgnoreCase(request.ciclo())) {
-      return ResponseEntity.badRequest().build();
+    public ReconstrucaoRankingController(
+        ReconstrucaoRankingService service
+    ) {
+        this.service = service;
     }
 
-    if (request.condominioId() <= 0) {
-      return ResponseEntity.badRequest().build();
+    @PostMapping("/reconstruir")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ResultadoReconstrucao> reconstruir(
+        @Valid @RequestBody ReconstruirRankingRequest request
+    ) {
+        return ResponseEntity.ok(
+            service.reconstruir(
+                request.tipo(),
+                request.condominioId()
+            )
+        );
     }
-
-    return ResponseEntity.ok(
-        service.reconstruir(
-            request.tipo(),
-            request.condominioId()));
-  }
 }

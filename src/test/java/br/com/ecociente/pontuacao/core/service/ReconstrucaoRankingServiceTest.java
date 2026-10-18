@@ -18,134 +18,198 @@ import org.springframework.data.redis.core.ZSetOperations;
 
 import br.com.ecociente.pontuacao.core.domain.CicloRanking;
 import br.com.ecociente.pontuacao.core.domain.TipoRankingType;
+import br.com.ecociente.pontuacao.core.exception.BusinessException;
 import br.com.ecociente.pontuacao.core.exception.InconsistenciaPontuacaoException;
 import br.com.ecociente.pontuacao.dataprovaider.repository.MovimentacaoPontosRepository;
 import br.com.ecociente.pontuacao.entrypoint.dto.request.EscopoReconstrucaoType;
 
 class ReconstrucaoRankingServiceTest {
 
-  private MovimentacaoPontosRepository repository;
-  private StringRedisTemplate redisTemplate;
-  private ZSetOperations<String, String> zSet;
-  private CycleService cycleService;
-  private ReconstrucaoRankingService service;
+    private MovimentacaoPontosRepository repository;
+    private StringRedisTemplate redisTemplate;
+    private ZSetOperations<String, String> zSet;
+    private CycleService cycleService;
+    private ReconstrucaoRankingService service;
 
-  @BeforeEach
-  void configurar() {
-    repository = mock(MovimentacaoPontosRepository.class);
-    redisTemplate = mock(StringRedisTemplate.class);
-    zSet = mock(ZSetOperations.class);
-    cycleService = mock(CycleService.class);
+    @BeforeEach
+    void configurar() {
+        repository = mock(MovimentacaoPontosRepository.class);
+        redisTemplate = mock(StringRedisTemplate.class);
+        zSet = mock(ZSetOperations.class);
+        cycleService = mock(CycleService.class);
 
-    Clock clock = Clock.fixed(
-        Instant.parse("2026-10-10T12:00:00Z"),
-        ZoneId.of("America/Sao_Paulo"));
+        Clock clock = Clock.fixed(
+                Instant.parse("2026-10-10T12:00:00Z"),
+                ZoneId.of("America/Sao_Paulo"));
 
-    service = new ReconstrucaoRankingService(
-        repository,
-        redisTemplate,
-        cycleService,
-        clock,
-        90);
+        service = new ReconstrucaoRankingService(
+                repository,
+                redisTemplate,
+                cycleService,
+                clock,
+                90);
 
-    when(redisTemplate.opsForZSet()).thenReturn(zSet);
+        when(redisTemplate.opsForZSet()).thenReturn(zSet);
 
-    CicloRanking ciclo = CicloRanking.builder()
-        .id("2026-10-05_7d")
-        .inicio(OffsetDateTime.parse("2026-10-05T00:00:00-03:00"))
-        .fim(OffsetDateTime.parse("2026-10-12T00:00:00-03:00"))
-        .build();
+        CicloRanking ciclo = CicloRanking.builder()
+                .id("2026-10-05_7d")
+                .inicio(OffsetDateTime.parse("2026-10-05T00:00:00-03:00"))
+                .fim(OffsetDateTime.parse("2026-10-12T00:00:00-03:00"))
+                .build();
 
-    when(cycleService.atual(TipoRankingType.MORADORES))
-        .thenReturn(ciclo);
+        when(cycleService.atual(TipoRankingType.MORADORES))
+                .thenReturn(ciclo);
 
-    when(cycleService.montarChave(
-        TipoRankingType.MORADORES, 7, ciclo)).thenReturn("ranking:moradores:7");
+        when(cycleService.montarChave(
+                TipoRankingType.MORADORES, 7, ciclo)).thenReturn("ranking:moradores:7");
 
-    when(redisTemplate.renameIfAbsent(
-        anyString(), eq("ranking:moradores:7:swap"))).thenReturn(true);
-  }
+        when(repository.tentarBloquearSincronizacao())
+                .thenReturn(true);
 
-  @Test
-  void deveReconstruirScoresDosMoradores() {
-    when(repository.agruparMoradoresNoCiclo(
-        eq(7), any(), any())).thenReturn(List.of(
-            new Object[] { 42, 100L },
-            new Object[] { 15, 50L }));
+        when(zSet.add(anyString(), anyString(), anyDouble()))
+                .thenReturn(true);
 
-    var resultado = service.reconstruir(
-        EscopoReconstrucaoType.MORADORES, 7);
+        when(redisTemplate.expireAt(anyString(), any(Instant.class)))
+                .thenReturn(true);
+    }
 
-    assertEquals(2, resultado.participantes());
+    @Test
+    void deveReconstruirScoresDosMoradores() {
+        when(repository.agruparMoradoresNoCiclo(
+                eq(7), any(), any())).thenReturn(List.of(
+                        new Object[] { 42, 100L },
+                        new Object[] { 15, 50L }));
 
-    verify(zSet).add(
-        contains(":tmp:"), eq("42"), eq(100.0d));
+        var resultado = service.reconstruir(
+                EscopoReconstrucaoType.MORADORES, 7);
 
-    verify(zSet).add(
-        contains(":tmp:"), eq("15"), eq(50.0d));
-  }
+        assertEquals(2, resultado.participantes());
 
-  @Test
-  void deveIgnorarPontuacaoZero() {
-    when(repository.agruparMoradoresNoCiclo(
-        eq(7), any(), any())).thenReturn(List.<Object[]>of(
-            new Object[] { 42, 0L },
-            new Object[] { 15, 30L }));
+        verify(zSet).add(
+                contains(":tmp:"), eq("42"), eq(100.0d));
 
-    var resultado = service.reconstruir(
-        EscopoReconstrucaoType.MORADORES, 7);
+        verify(zSet).add(
+                contains(":tmp:"), eq("15"), eq(50.0d));
+    }
 
-    assertEquals(1, resultado.participantes());
-    verify(zSet).add(
-        contains(":tmp:"), eq("15"), eq(30.0d));
-  }
+    @Test
+    void deveIgnorarPontuacaoZero() {
+        when(repository.agruparMoradoresNoCiclo(
+                eq(7), any(), any())).thenReturn(List.<Object[]>of(
+                        new Object[] { 42, 0L },
+                        new Object[] { 15, 30L }));
 
-  @Test
-  void deveRejeitarSaldoNegativo() {
-    when(repository.agruparMoradoresNoCiclo(
-        eq(7), any(), any())).thenReturn(List.<Object[]>of(
-            new Object[] { 42, -10L }));
+        var resultado = service.reconstruir(
+                EscopoReconstrucaoType.MORADORES, 7);
 
-    assertThrows(
-        InconsistenciaPontuacaoException.class,
-        () -> service.reconstruir(
-            EscopoReconstrucaoType.MORADORES, 7));
+        assertEquals(1, resultado.participantes());
+        verify(zSet).add(
+                contains(":tmp:"), eq("15"), eq(30.0d));
+    }
 
-    verify(redisTemplate, never()).rename(
-        anyString(), anyString());
-  }
+    @Test
+    void deveRejeitarSaldoNegativo() {
+        when(repository.agruparMoradoresNoCiclo(
+                eq(7), any(), any())).thenReturn(List.<Object[]>of(
+                        new Object[] { 42, -10L }));
 
-  @Test
-  void deveRemoverRankingQuandoNaoExistemParticipantes() {
-    when(repository.agruparMoradoresNoCiclo(
-        eq(7), any(), any())).thenReturn(List.of());
+        assertThrows(
+                InconsistenciaPontuacaoException.class,
+                () -> service.reconstruir(
+                        EscopoReconstrucaoType.MORADORES, 7));
 
-    var resultado = service.reconstruir(
-        EscopoReconstrucaoType.MORADORES, 7);
+        verify(redisTemplate, never()).rename(
+                anyString(), anyString());
+    }
 
-    assertEquals(0, resultado.participantes());
+    @Test
+    void deveRemoverRankingQuandoNaoExistemParticipantes() {
+        when(repository.agruparMoradoresNoCiclo(
+                eq(7), any(), any())).thenReturn(List.of());
 
-    verify(redisTemplate).delete("ranking:moradores:7");
-    verify(redisTemplate, never()).rename(
-        anyString(), anyString());
-  }
+        var resultado = service.reconstruir(
+                EscopoReconstrucaoType.MORADORES, 7);
 
-  @Test
-  void naoDeveSubstituirRankingSeTrocaIntermediariaFalhar() {
-    when(repository.agruparMoradoresNoCiclo(
-        eq(7), any(), any())).thenReturn(List.<Object[]>of(
-            new Object[] { 42, 100L }));
+        assertEquals(0, resultado.participantes());
 
-    when(redisTemplate.renameIfAbsent(
-        anyString(), eq("ranking:moradores:7:swap"))).thenReturn(false);
+        verify(redisTemplate).delete("ranking:moradores:7");
+        verify(redisTemplate, never()).rename(
+                anyString(), anyString());
+    }
 
-    assertThrows(
-        IllegalStateException.class,
-        () -> service.reconstruir(
-            EscopoReconstrucaoType.MORADORES, 7));
+    @Test
+    void deveSubstituirRankingComRenameDireto() {
+        when(repository.agruparMoradoresNoCiclo(
+                eq(7), any(), any())).thenReturn(List.<Object[]>of(
+                        new Object[] { 42, 100L }));
 
-    verify(redisTemplate, never()).rename(
-        "ranking:moradores:7:swap",
-        "ranking:moradores:7");
-  }
+        service.reconstruir(
+                EscopoReconstrucaoType.MORADORES,
+                7);
+
+        var ordem = inOrder(repository, zSet, redisTemplate);
+
+        ordem.verify(repository).tentarBloquearSincronizacao();
+
+        ordem.verify(repository).agruparMoradoresNoCiclo(
+                eq(7), any(), any());
+
+        ordem.verify(zSet).add(
+                contains(":tmp:"),
+                eq("42"),
+                eq(100.0d));
+
+        ordem.verify(redisTemplate).expireAt(
+                contains(":tmp:"),
+                any(Instant.class));
+
+        ordem.verify(redisTemplate).rename(
+                contains(":tmp:"),
+                eq("ranking:moradores:7"));
+
+        verify(redisTemplate, never()).renameIfAbsent(
+                anyString(),
+                anyString());
+    }
+
+    @Test
+    void naoDeveConsultarSaldosOuAlterarRedisSemConseguirLock() {
+        when(repository.tentarBloquearSincronizacao())
+                .thenReturn(false);
+
+        assertThrows(
+                BusinessException.class,
+                () -> service.reconstruir(
+                        EscopoReconstrucaoType.MORADORES,
+                        7));
+
+        verify(repository, never()).agruparMoradoresNoCiclo(
+                anyInt(), any(), any());
+
+        verifyNoInteractions(redisTemplate, cycleService);
+    }
+
+    @Test
+    void naoDevePublicarRankingSeDefinicaoDeExpiracaoFalhar() {
+        when(repository.agruparMoradoresNoCiclo(
+                eq(7), any(), any())).thenReturn(List.<Object[]>of(
+                        new Object[] { 42, 100L }));
+
+        when(redisTemplate.expireAt(
+                anyString(), any(Instant.class))).thenReturn(false);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.reconstruir(
+                        EscopoReconstrucaoType.MORADORES,
+                        7));
+
+        verify(redisTemplate, never()).rename(
+                anyString(),
+                anyString());
+
+        verify(redisTemplate, never()).delete("ranking:moradores:7");
+
+        verify(redisTemplate).delete(contains(":tmp:"));
+    }
 }

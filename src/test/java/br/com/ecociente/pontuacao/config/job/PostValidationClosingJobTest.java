@@ -2,6 +2,7 @@
 package br.com.ecociente.pontuacao.config.job;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -24,16 +25,15 @@ class PostValidationClosingJobTest {
         service = mock(PostagemValidacaoService.class);
 
         job = new PostValidationClosingJob(
-            gateway,
-            service,
-            100
-        );
+                gateway,
+                service,
+                100);
     }
 
     @Test
     void deveEncerrarTodasAsPostagensVencidas() {
-        when(gateway.buscarVencidas(100))
-            .thenReturn(List.of(10, 11, 12));
+        when(gateway.buscarVencidasApos(0, 100))
+                .thenReturn(List.of(10, 11, 12));
 
         job.executar();
 
@@ -45,8 +45,8 @@ class PostValidationClosingJobTest {
 
     @Test
     void naoDeveProcessarQuandoNaoExistiremPostagens() {
-        when(gateway.buscarVencidas(100))
-            .thenReturn(List.of());
+        when(gateway.buscarVencidasApos(0, 100))
+                .thenReturn(List.of());
 
         job.executar();
 
@@ -55,11 +55,10 @@ class PostValidationClosingJobTest {
 
     @Test
     void deveContinuarSeUmaPostagemFalhar() {
-        when(gateway.buscarVencidas(100))
-            .thenReturn(List.of(10, 11, 12));
+        when(gateway.buscarVencidasApos(0, 100)).thenReturn(List.of(10, 11, 12));
 
         doThrow(new IllegalStateException("Falha na postagem"))
-            .when(service).encerrar(11);
+                .when(service).encerrar(11);
 
         assertDoesNotThrow(() -> job.executar());
 
@@ -71,13 +70,11 @@ class PostValidationClosingJobTest {
     @Test
     void deveRejeitarLoteInvalido() {
         assertThrows(IllegalArgumentException.class,
-            () -> new PostValidationClosingJob(
-                gateway, service, 0
-            ));
+                () -> new PostValidationClosingJob(
+                        gateway, service, 0));
 
         assertThrows(IllegalArgumentException.class,
-            () -> new PostValidationClosingJob(
-                gateway, service, 1001
-            ));
+                () -> new PostValidationClosingJob(
+                        gateway, service, 1001));
     }
 }

@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import br.com.ecociente.pontuacao.core.exception.AlreadyExistsException;
@@ -25,6 +27,11 @@ import br.com.ecociente.pontuacao.core.exception.InconsistenciaPontuacaoExceptio
 import br.com.ecociente.pontuacao.core.exception.NotFoundException;
 import br.com.ecociente.pontuacao.entrypoint.dto.ErrorResponse;
 import br.com.ecociente.pontuacao.entrypoint.dto.ValidationError;
+
+import org.springframework.dao.QueryTimeoutException;
+
+
+import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -44,11 +51,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         }
 
         @ExceptionHandler(BusinessException.class)
-        public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex) {
+        public ResponseEntity<ErrorResponse> handleBusiness(
+                        BusinessException ex) {
                 log.warn("Regra de negócio: {}", ex.getCodigoErro());
 
+                HttpStatus status = "IDEMPOTENCY_KEY_INVALIDA".equals(ex.getCodigoErro())
+                                ? HttpStatus.BAD_REQUEST
+                                : HttpStatus.CONFLICT;
+
                 return resposta(
-                                HttpStatus.CONFLICT,
+                                status,
                                 ex.getCodigoErro(),
                                 ex.getMessage());
         }
@@ -198,5 +210,70 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                 HttpStatus.INTERNAL_SERVER_ERROR,
                                 "ERRO_INTERNO",
                                 "Erro interno do servidor");
+        }
+
+        @ExceptionHandler(ConstraintViolationException.class)
+        public ResponseEntity<ErrorResponse> handleConstraintViolation(
+                        ConstraintViolationException ex) {
+                var detalhes = ex.getConstraintViolations()
+                                .stream()
+                                .map(violacao -> new ValidationError(
+                                                violacao.getPropertyPath().toString(),
+                                                violacao.getMessage()))
+                                .toList();
+
+                return ResponseEntity.badRequest().body(
+                                new ErrorResponse(
+                                                HttpStatus.BAD_REQUEST.value(),
+                                                "ERRO_VALIDACAO",
+                                                detalhes));
+        }
+
+        @Override
+        protected ResponseEntity<Object> handleHandlerMethodValidationException(
+                        HandlerMethodValidationException ex,
+                        HttpHeaders headers,
+                        HttpStatusCode status,
+                        WebRequest request) {
+                if (ex.isForReturnValue()) {
+                        return handleExceptionInternal(
+                                        ex,
+                                        null,
+                                        headers,
+                                        status,
+                                        request);
+                }
+
+                return new ResponseEntity<>(
+                                new ErrorResponse(
+                                                HttpStatus.BAD_REQUEST.value(),
+                                                "ERRO_VALIDACAO",
+                                                List.of(new ValidationError(
+                                                                null,
+                                                                "Verifique os parâmetros informados"))),
+                                headers,
+                                HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(RedisConnectionFailureException.class)
+        public ResponseEntity<ErrorResponse> handleRedisUnavailable(
+                        RedisConnectionFailureException ex) {
+                log.error("Falha de conexão com Redis", ex);
+
+                return resposta(
+                                HttpStatus.SERVICE_UNAVAILABLE,
+                                "REDIS_INDISPONIVEL",
+                                "O ranking está temporariamente indisponível");
+        }
+
+        @ExceptionHandler(QueryTimeoutException.class)
+        public ResponseEntity<ErrorResponse> handleQueryTimeout(
+                        QueryTimeoutException ex) {
+                log.error("Tempo limite de acesso à infraestrutura excedido", ex);
+
+                return resposta(
+                                HttpStatus.SERVICE_UNAVAILABLE,
+                                "TEMPO_LIMITE_EXCEDIDO",
+                                "O serviço demorou além do esperado. Tente novamente");
         }
 }

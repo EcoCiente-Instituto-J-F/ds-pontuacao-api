@@ -38,7 +38,7 @@ public class PostagemValidacaoController {
   }
 
   @PatchMapping("/{postagemId}/decisao")
-  @PreAuthorize("hasAnyRole('ADMIN', 'SYNDIC')")
+  @PreAuthorize("hasAnyRole('ADMIN', 'SINDICO')")
   public ResponseEntity<Void> decidir(
       @PathVariable @Positive Integer postagemId,
       @Valid @RequestBody DecisaoPostagemRequest request,

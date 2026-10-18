@@ -194,4 +194,13 @@ public interface MovimentacaoPontosRepository
             @Param("inicio") OffsetDateTime inicio,
             @Param("fim") OffsetDateTime fim);
 
+    @Query("""
+            SELECT m
+            FROM MovimentacaoPontosEntity m
+            WHERE m.redisSincronizado = false
+            ORDER BY m.tentativasSyncRedis ASC, m.id ASC
+            """)
+    List<MovimentacaoPontosEntity> buscarPendentesParaSincronizacao(
+            Pageable pageable);
+
 }

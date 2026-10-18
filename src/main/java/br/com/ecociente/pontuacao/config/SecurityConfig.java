@@ -89,7 +89,7 @@ public class SecurityConfig {
             .requestMatchers(
                 HttpMethod.PATCH,
                 "/api/v1/postagens/*/decisao")
-            .hasAnyRole("ADMIN", "SYNDIC")
+            .hasAnyRole("ADMIN", "SINDICO")
 
             .anyRequest().denyAll())
         .oauth2ResourceServer(oauth -> oauth

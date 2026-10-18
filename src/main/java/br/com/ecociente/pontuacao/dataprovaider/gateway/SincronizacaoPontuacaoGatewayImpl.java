@@ -27,9 +27,8 @@ public class SincronizacaoPontuacaoGatewayImpl
 
         @Override
         public List<Long> buscarIdsPendentes(int limite) {
-                return repository
-                                .findByRedisSincronizadoFalseOrderByIdAsc(
-                                                PageRequest.of(0, limite))
+                return repository.buscarPendentesParaSincronizacao(
+                                PageRequest.of(0, limite))
                                 .stream()
                                 .map(entity -> entity.getId())
                                 .toList();
@@ -111,4 +110,5 @@ public class SincronizacaoPontuacaoGatewayImpl
         public Long contarPendentes() {
                 return repository.countByRedisSincronizadoFalse();
         }
+
 }

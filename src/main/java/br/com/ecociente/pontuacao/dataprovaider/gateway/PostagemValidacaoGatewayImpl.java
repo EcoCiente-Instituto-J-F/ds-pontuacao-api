@@ -5,7 +5,8 @@ import java.util.List;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
-
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import br.com.ecociente.pontuacao.core.gateway.PostagemValidacaoGateway;
 import br.com.ecociente.pontuacao.dataprovaider.repository.PostagemRepository;
 
@@ -51,5 +52,41 @@ public class PostagemValidacaoGatewayImpl
         "CALL sp_atualizar_trust_score(?, ?)",
         usuarioId,
         condominioId);
+  }
+
+  @Override
+  public List<Integer> buscarVencidasApos(
+      Integer ultimoId,
+      int limite) {
+    return repository.buscarPostagensVencidasApos(
+        ultimoId,
+        limite);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean tentarBloquearFechamento(Integer postagemId) {
+    return Boolean.TRUE.equals(
+        jdbcTemplate.queryForObject(
+            "SELECT pg_try_advisory_xact_lock(731942002, ?)",
+            Boolean.class,
+            postagemId));
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean janelaVencida(Integer postagemId) {
+    return Boolean.TRUE.equals(
+        jdbcTemplate.queryForObject(
+            """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM tb_postagens
+                    WHERE id_postagem = ?
+                      AND data_limite_analise <= now()
+                )
+                """,
+            Boolean.class,
+            postagemId));
   }
 }

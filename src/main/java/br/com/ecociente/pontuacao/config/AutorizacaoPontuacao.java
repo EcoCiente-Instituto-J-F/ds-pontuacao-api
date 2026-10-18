@@ -36,9 +36,7 @@ public class AutorizacaoPontuacao {
   public boolean podeConsultarCondominio(
       Authentication authentication,
       Integer condominioId) {
-
-    if (!autenticado(authentication)
-        || condominioId == null) {
+    if (!autenticado(authentication) || condominioId == null) {
       return false;
     }
 
@@ -48,10 +46,18 @@ public class AutorizacaoPontuacao {
 
     Integer usuarioId = obterUsuarioId(authentication);
 
-    return usuarioId != null
-        && vinculoGateway.possuiVinculoAtivo(
-            usuarioId,
-            condominioId);
+    if (usuarioId == null) {
+      return false;
+    }
+
+    if (possuiPapel(authentication, "ROLE_SINDICO")
+        && vinculoGateway.ehSindico(usuarioId, condominioId)) {
+      return true;
+    }
+
+    return vinculoGateway.possuiVinculoAtivo(
+        usuarioId,
+        condominioId);
   }
 
   public boolean podeConsultarTorre(
@@ -70,8 +76,7 @@ public class AutorizacaoPontuacao {
   public boolean podeDecidirPostagem(
       Authentication authentication,
       Integer condominioId) {
-
-    if (!autenticado(authentication)) {
+    if (!autenticado(authentication) || condominioId == null) {
       return false;
     }
 
@@ -79,16 +84,14 @@ public class AutorizacaoPontuacao {
       return true;
     }
 
-    if (!possuiPapel(authentication, "ROLE_SYNDIC")) {
+    if (!possuiPapel(authentication, "ROLE_SINDICO")) {
       return false;
     }
 
     Integer usuarioId = obterUsuarioId(authentication);
 
     return usuarioId != null
-        && vinculoGateway.ehSindico(
-            usuarioId,
-            condominioId);
+        && vinculoGateway.ehSindico(usuarioId, condominioId);
   }
 
   private boolean autenticado(Authentication authentication) {
