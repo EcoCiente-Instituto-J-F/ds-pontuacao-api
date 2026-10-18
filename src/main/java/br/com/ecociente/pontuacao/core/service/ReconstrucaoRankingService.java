@@ -9,14 +9,15 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import br.com.ecociente.pontuacao.core.domain.CicloRanking;
 import br.com.ecociente.pontuacao.core.domain.TipoRankingType;
+import br.com.ecociente.pontuacao.core.exception.BusinessException;
 import br.com.ecociente.pontuacao.core.exception.InconsistenciaPontuacaoException;
 import br.com.ecociente.pontuacao.dataprovaider.repository.MovimentacaoPontosRepository;
 import br.com.ecociente.pontuacao.entrypoint.dto.request.EscopoReconstrucaoType;
-
-import lombok.RequiredArgsConstructor;
 
 @Service
 public class ReconstrucaoRankingService {
@@ -41,9 +42,15 @@ public class ReconstrucaoRankingService {
     this.retentionDays = retentionDays;
   }
 
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public ResultadoReconstrucao reconstruir(
       EscopoReconstrucaoType tipo,
       Integer condominioId) {
+    if (!repository.tentarBloquearSincronizacao()) {
+      throw new BusinessException(
+          "RANKING_EM_PROCESSAMENTO",
+          "Há uma sincronização ou reconstrução em andamento. Tente novamente");
+    }
 
     int participantes = 0;
 
@@ -72,8 +79,14 @@ public class ReconstrucaoRankingService {
   private int reconstruirTipo(
       TipoRankingType tipo,
       Integer condominioId) {
-
     CicloRanking ciclo = cycleService.atual(tipo);
+
+    OffsetDateTime expiraEm = ciclo.getFim().plusDays(retentionDays);
+
+    if (!expiraEm.isAfter(OffsetDateTime.now(clock))) {
+      throw new IllegalStateException(
+          "O ciclo já ultrapassou a retenção");
+    }
 
     List<Object[]> saldos;
 
@@ -97,6 +110,7 @@ public class ReconstrucaoRankingService {
     String temporaria = chave + ":tmp:" + UUID.randomUUID();
 
     int total = 0;
+    RuntimeException falhaPrincipal = null;
 
     try {
       for (Object[] saldo : saldos) {
@@ -111,47 +125,53 @@ public class ReconstrucaoRankingService {
         }
 
         if (pontos > 0) {
-          redisTemplate.opsForZSet().add(
+          Boolean adicionado = redisTemplate.opsForZSet().add(
               temporaria,
               participanteId,
               pontos);
 
+          if (!Boolean.TRUE.equals(adicionado)) {
+            throw new IllegalStateException(
+                "Não foi possível montar o ranking temporário");
+          }
+
           total++;
+
+          if (total == 1) {
+            Boolean expiracaoDefinida = redisTemplate.expireAt(
+                temporaria,
+                expiraEm.toInstant());
+
+            if (!Boolean.TRUE.equals(expiracaoDefinida)) {
+              throw new IllegalStateException(
+                  "Não foi possível definir a retenção do ranking");
+            }
+          }
         }
-      }
-
-      OffsetDateTime expiraEm = ciclo.getFim().plusDays(retentionDays);
-
-      if (!expiraEm.isAfter(OffsetDateTime.now(clock))) {
-        throw new IllegalStateException(
-            "O ciclo já ultrapassou a retenção");
       }
 
       if (total == 0) {
         redisTemplate.delete(chave);
       } else {
-        redisTemplate.expireAt(
-            temporaria,
-            expiraEm.toInstant());
-
-        Boolean renomeada = redisTemplate.renameIfAbsent(
-            temporaria,
-            chave + ":swap");
-
-        if (!Boolean.TRUE.equals(renomeada)) {
-          throw new IllegalStateException(
-              "Já existe uma reconstrução intermediária");
-        }
-
-        redisTemplate.rename(
-            chave + ":swap",
-            chave);
+        redisTemplate.rename(temporaria, chave);
       }
 
       return total;
 
+    } catch (RuntimeException exception) {
+      falhaPrincipal = exception;
+      throw exception;
+
     } finally {
-      redisTemplate.delete(temporaria);
+      try {
+        redisTemplate.delete(temporaria);
+      } catch (RuntimeException limpezaException) {
+        if (falhaPrincipal != null) {
+          falhaPrincipal.addSuppressed(limpezaException);
+        } else {
+          throw limpezaException;
+        }
+      }
     }
   }
 

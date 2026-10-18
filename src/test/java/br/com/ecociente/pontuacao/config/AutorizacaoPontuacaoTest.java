@@ -2,10 +2,10 @@
 package br.com.ecociente.pontuacao.config;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,121 +18,172 @@ import br.com.ecociente.pontuacao.core.gateway.VinculoCondominialGateway;
 
 class AutorizacaoPontuacaoTest {
 
-  private VinculoCondominialGateway gateway;
-  private AutorizacaoPontuacao autorizacao;
+    private VinculoCondominialGateway gateway;
+    private AutorizacaoPontuacao autorizacao;
 
-  @BeforeEach
-  void configurar() {
-    gateway = mock(VinculoCondominialGateway.class);
-    autorizacao = new AutorizacaoPontuacao(gateway);
-  }
+    @BeforeEach
+    void configurar() {
+        gateway = mock(VinculoCondominialGateway.class);
+        autorizacao = new AutorizacaoPontuacao(gateway);
+    }
 
-  private JwtAuthenticationToken usuario(
-      Integer usuarioId,
-      String papel) {
+    private JwtAuthenticationToken usuario(
+            Integer usuarioId,
+            String papel) {
 
-    Jwt jwt = Jwt.withTokenValue("token-teste")
-        .header("alg", "none")
-        .claim("usuarioId", usuarioId)
-        .build();
+        Jwt jwt = Jwt.withTokenValue("token-teste")
+                .header("alg", "none")
+                .claim("usuarioId", usuarioId)
+                .build();
 
-    return new JwtAuthenticationToken(
-        jwt,
-        List.of(new SimpleGrantedAuthority(papel)));
-  }
+        return new JwtAuthenticationToken(
+                jwt,
+                List.of(new SimpleGrantedAuthority(papel)));
+    }
 
-  @Test
-  void usuarioPodeConsultarSeusMovimentos() {
-    assertTrue(autorizacao.podeConsultar(
-        usuario(42, "ROLE_USER"), 42));
-  }
+    @Test
+    void usuarioPodeConsultarSeusMovimentos() {
+        assertTrue(autorizacao.podeConsultar(
+                usuario(42, "ROLE_USER"), 42));
+    }
 
-  @Test
-  void usuarioNaoPodeConsultarMovimentosDeOutro() {
-    assertFalse(autorizacao.podeConsultar(
-        usuario(42, "ROLE_USER"), 99));
-  }
+    @Test
+    void usuarioNaoPodeConsultarMovimentosDeOutro() {
+        assertFalse(autorizacao.podeConsultar(
+                usuario(42, "ROLE_USER"), 99));
+    }
 
-  @Test
-  void adminPodeConsultarMovimentosDeOutro() {
-    assertTrue(autorizacao.podeConsultar(
-        usuario(1, "ROLE_ADMIN"), 42));
-  }
+    @Test
+    void adminPodeConsultarMovimentosDeOutro() {
+        assertTrue(autorizacao.podeConsultar(
+                usuario(1, "ROLE_ADMIN"), 42));
+    }
 
-  @Test
-  void usuarioPodeConsultarCondominioComVinculoAtivo() {
-    when(gateway.possuiVinculoAtivo(42, 7))
-        .thenReturn(true);
+    @Test
+    void usuarioPodeConsultarCondominioComVinculoAtivo() {
+        when(gateway.possuiVinculoAtivo(42, 7))
+                .thenReturn(true);
 
-    assertTrue(autorizacao.podeConsultarCondominio(
-        usuario(42, "ROLE_USER"), 7));
-  }
+        assertTrue(autorizacao.podeConsultarCondominio(
+                usuario(42, "ROLE_USER"), 7));
+    }
 
-  @Test
-  void usuarioNaoPodeConsultarOutroCondominio() {
-    when(gateway.possuiVinculoAtivo(42, 8))
-        .thenReturn(false);
+    @Test
+    void usuarioNaoPodeConsultarOutroCondominio() {
+        when(gateway.possuiVinculoAtivo(42, 8))
+                .thenReturn(false);
 
-    assertFalse(autorizacao.podeConsultarCondominio(
-        usuario(42, "ROLE_USER"), 8));
-  }
+        assertFalse(autorizacao.podeConsultarCondominio(
+                usuario(42, "ROLE_USER"), 8));
+    }
 
-  @Test
-  void adminPodeConsultarCondominio() {
-    assertTrue(autorizacao.podeConsultarCondominio(
-        usuario(1, "ROLE_ADMIN"), 7));
-  }
+    @Test
+    void adminPodeConsultarCondominio() {
+        assertTrue(autorizacao.podeConsultarCondominio(
+                usuario(1, "ROLE_ADMIN"), 7));
+    }
 
-  @Test
-  void deveNegarTorreDeOutroCondominio() {
-    when(gateway.possuiVinculoAtivo(42, 7))
-        .thenReturn(true);
+    @Test
+    void deveNegarTorreDeOutroCondominio() {
+        when(gateway.possuiVinculoAtivo(42, 7))
+                .thenReturn(true);
 
-    when(gateway.torrePertenceCondominio(5, 7))
-        .thenReturn(false);
+        when(gateway.torrePertenceCondominio(5, 7))
+                .thenReturn(false);
 
-    assertFalse(autorizacao.podeConsultarTorre(
-        usuario(42, "ROLE_USER"), 7, 5));
-  }
+        assertFalse(autorizacao.podeConsultarTorre(
+                usuario(42, "ROLE_USER"), 7, 5));
+    }
 
-  @Test
-  void sindicoPodeDecidirNoProprioCondominio() {
-    when(gateway.ehSindico(42, 7))
-        .thenReturn(true);
+    @Test
+    void sindicoPodeDecidirNoProprioCondominio() {
+        when(gateway.ehSindico(42, 7))
+                .thenReturn(true);
 
-    assertTrue(autorizacao.podeDecidirPostagem(
-        usuario(42, "ROLE_SYNDIC"), 7));
-  }
+        assertTrue(autorizacao.podeDecidirPostagem(
+                usuario(42, "ROLE_SINDICO"), 7));
+    }
 
-  @Test
-  void sindicoNaoPodeDecidirEmOutroCondominio() {
-    when(gateway.ehSindico(42, 8))
-        .thenReturn(false);
+    @Test
+    void sindicoNaoPodeDecidirEmOutroCondominio() {
+        when(gateway.ehSindico(42, 8))
+                .thenReturn(false);
 
-    assertFalse(autorizacao.podeDecidirPostagem(
-        usuario(42, "ROLE_SYNDIC"), 8));
-  }
+        assertFalse(autorizacao.podeDecidirPostagem(
+                usuario(42, "ROLE_SINDICO"), 8));
+    }
 
-  @Test
-  void moradorNaoPodeDecidirPostagem() {
-    assertFalse(autorizacao.podeDecidirPostagem(
-        usuario(42, "ROLE_USER"), 7));
-  }
+    @Test
+    void moradorNaoPodeDecidirPostagem() {
+        assertFalse(autorizacao.podeDecidirPostagem(
+                usuario(42, "ROLE_USER"), 7));
+    }
 
-  @Test
-  void deveNegarUsuarioNaoAutenticado() {
-    assertFalse(autorizacao.podeConsultarCondominio(
-        null, 7));
-  }
+    @Test
+    void deveNegarUsuarioNaoAutenticado() {
+        assertFalse(autorizacao.podeConsultarCondominio(
+                null, 7));
+    }
 
-  @Test
-  void deveNegarAutenticacaoSemJwt() {
-    var authentication = new UsernamePasswordAuthenticationToken(
-        "usuario",
-        "senha",
-        List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    @Test
+    void deveNegarAutenticacaoSemJwt() {
+        var authentication = new UsernamePasswordAuthenticationToken(
+                "usuario",
+                "senha",
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
-    assertFalse(autorizacao.podeConsultarCondominio(
-        authentication, 7));
-  }
+        assertFalse(autorizacao.podeConsultarCondominio(
+                authentication, 7));
+    }
+
+    @Test
+    void sindicoResponsavelPodeConsultarSemVinculoRelacional() {
+        when(gateway.ehSindico(42, 7)).thenReturn(true);
+
+        assertTrue(autorizacao.podeConsultarCondominio(
+                usuario(42, "ROLE_SINDICO"),
+                7));
+
+        verify(gateway, never()).possuiVinculoAtivo(anyInt(), anyInt());
+    }
+
+    @Test
+    void papelSindicoSozinhoNaoAutorizaOutroCondominio() {
+        when(gateway.ehSindico(42, 8)).thenReturn(false);
+        when(gateway.possuiVinculoAtivo(42, 8)).thenReturn(false);
+
+        assertFalse(autorizacao.podeConsultarCondominio(
+                usuario(42, "ROLE_SINDICO"),
+                8));
+    }
+
+    @Test
+    void sindicoPodeConsultarComoMoradorDeOutroCondominio() {
+        when(gateway.ehSindico(42, 8)).thenReturn(false);
+        when(gateway.possuiVinculoAtivo(42, 8)).thenReturn(true);
+
+        assertTrue(autorizacao.podeConsultarCondominio(
+                usuario(42, "ROLE_SINDICO"),
+                8));
+    }
+
+    @Test
+    void sindicoResponsavelNaoPodeConsultarTorreDeOutroCondominio() {
+        when(gateway.ehSindico(42, 7)).thenReturn(true);
+        when(gateway.torrePertenceCondominio(2001, 7)).thenReturn(false);
+
+        assertFalse(autorizacao.podeConsultarTorre(
+                usuario(42, "ROLE_SINDICO"),
+                7,
+                2001));
+    }
+
+    @Test
+    void papelAntigoNaoDeveAutorizarDecisao() {
+        assertFalse(autorizacao.podeDecidirPostagem(
+                usuario(42, "ROLE_SYNDIC"),
+                7));
+
+        verify(gateway, never()).ehSindico(anyInt(), anyInt());
+    }
 }

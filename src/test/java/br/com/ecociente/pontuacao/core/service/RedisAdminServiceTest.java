@@ -1,4 +1,3 @@
-
 package br.com.ecociente.pontuacao.core.service;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,133 +15,194 @@ import br.com.ecociente.pontuacao.core.gateway.SincronizacaoPontuacaoGateway;
 
 class RedisAdminServiceTest {
 
-  private SincronizacaoPontuacaoGateway gateway;
-  private SincronizacaoPontuacaoService sincronizacaoService;
-  private StringRedisTemplate redisTemplate;
-  private RedisAdminService service;
+    private SincronizacaoPontuacaoGateway gateway;
+    private SincronizacaoPontuacaoService sincronizacaoService;
+    private StringRedisTemplate redisTemplate;
+    private RedisAdminService service;
 
-  @BeforeEach
-  void configurar() {
-    gateway = mock(SincronizacaoPontuacaoGateway.class);
-    sincronizacaoService = mock(SincronizacaoPontuacaoService.class);
-    redisTemplate = mock(StringRedisTemplate.class);
+    @BeforeEach
+    void configurar() {
+        gateway = mock(SincronizacaoPontuacaoGateway.class);
+        sincronizacaoService = mock(SincronizacaoPontuacaoService.class);
+        redisTemplate = mock(StringRedisTemplate.class);
 
-    service = new RedisAdminService(
-        gateway,
-        sincronizacaoService,
-        redisTemplate,
-        100);
-  }
+        service = new RedisAdminService(
+            gateway,
+            sincronizacaoService,
+            redisTemplate,
+            100
+        );
+    }
 
-  @Test
-  void deveSincronizarMovimentacoesPendentes() {
-    when(gateway.buscarIdsPendentes(100))
-        .thenReturn(List.of(1L, 2L));
+    @Test
+    void deveSincronizarMovimentacoesPendentes() {
+        when(gateway.buscarIdsPendentes(100))
+            .thenReturn(List.of(1L, 2L));
 
-    when(sincronizacaoService.sincronizar(1L))
-        .thenReturn(true);
+        when(sincronizacaoService.sincronizar(1L))
+            .thenReturn(true);
 
-    when(sincronizacaoService.sincronizar(2L))
-        .thenReturn(true);
+        when(sincronizacaoService.sincronizar(2L))
+            .thenReturn(true);
 
-    when(gateway.contarPendentes()).thenReturn(0L);
+        when(gateway.contarPendentes()).thenReturn(0L);
 
-    var resultado = service.sincronizarPendentes();
+        var resultado = service.sincronizarPendentes();
 
-    assertEquals(2, resultado.processadas());
-    assertEquals(2, resultado.sincronizadas());
-    assertEquals(0, resultado.falhas());
-    assertEquals(0L, resultado.pendentesRestantes());
+        assertEquals(2, resultado.processadas());
+        assertEquals(2, resultado.sincronizadas());
+        assertEquals(0, resultado.falhas());
+        assertEquals(Long.valueOf(0), resultado.pendentesRestantes());
 
-    verify(gateway, never()).registrarFalha(anyLong());
-  }
+        verify(gateway, never()).registrarFalha(anyLong());
+    }
 
-  @Test
-  void deveRegistrarFalhaDeSincronizacao() {
-    when(gateway.buscarIdsPendentes(100))
-        .thenReturn(List.of(1L, 2L));
+    @Test
+    void deveRegistrarFalhaDeSincronizacao() {
+        when(gateway.buscarIdsPendentes(100))
+            .thenReturn(List.of(1L, 2L));
 
-    when(sincronizacaoService.sincronizar(1L))
-        .thenReturn(true);
+        when(sincronizacaoService.sincronizar(1L))
+            .thenReturn(true);
 
-    when(sincronizacaoService.sincronizar(2L))
-        .thenThrow(new IllegalStateException("Redis indisponível"));
+        when(sincronizacaoService.sincronizar(2L))
+            .thenThrow(new IllegalStateException("Redis indisponível"));
 
-    when(gateway.contarPendentes()).thenReturn(1L);
+        when(gateway.contarPendentes()).thenReturn(1L);
 
-    var resultado = service.sincronizarPendentes();
+        var resultado = service.sincronizarPendentes();
 
-    assertEquals(2, resultado.processadas());
-    assertEquals(1, resultado.sincronizadas());
-    assertEquals(1, resultado.falhas());
-    assertEquals(1L, resultado.pendentesRestantes());
+        assertEquals(2, resultado.processadas());
+        assertEquals(1, resultado.sincronizadas());
+        assertEquals(1, resultado.falhas());
+        assertEquals(Long.valueOf(1), resultado.pendentesRestantes());
 
-    verify(gateway).registrarFalha(2L);
-    verify(gateway, never()).registrarFalha(1L);
-  }
+        verify(gateway).registrarFalha(2L);
+        verify(gateway, never()).registrarFalha(1L);
+    }
 
-  @Test
-  void deveRetornarZeroQuandoNaoExistiremPendencias() {
-    when(gateway.buscarIdsPendentes(100))
-        .thenReturn(List.of());
+    @Test
+    void deveRetornarZeroQuandoNaoExistiremPendencias() {
+        when(gateway.buscarIdsPendentes(100))
+            .thenReturn(List.of());
 
-    when(gateway.contarPendentes()).thenReturn(0L);
+        when(gateway.contarPendentes()).thenReturn(0L);
 
-    var resultado = service.sincronizarPendentes();
+        var resultado = service.sincronizarPendentes();
 
-    assertEquals(0, resultado.processadas());
-    assertEquals(0, resultado.sincronizadas());
-    assertEquals(0, resultado.falhas());
+        assertEquals(0, resultado.processadas());
+        assertEquals(0, resultado.sincronizadas());
+        assertEquals(0, resultado.falhas());
+        assertEquals(Long.valueOf(0), resultado.pendentesRestantes());
 
-    verifyNoInteractions(sincronizacaoService);
-  }
+        verifyNoInteractions(sincronizacaoService);
+        verify(gateway, never()).registrarFalha(anyLong());
+    }
 
-  @Test
-  void deveInformarRedisDisponivel() {
-    when(redisTemplate.execute(
-        org.mockito.ArgumentMatchers
-            .<RedisCallback<Boolean>>any()))
-        .thenReturn(true);
+    @Test
+    void deveInformarRedisDisponivel() {
+        when(redisTemplate.execute(
+            org.mockito.ArgumentMatchers.<RedisCallback<Boolean>>any()
+        )).thenReturn(true);
 
-    when(gateway.contarPendentes()).thenReturn(3L);
+        when(gateway.contarPendentes()).thenReturn(3L);
 
-    var resultado = service.consultarStatus();
+        var resultado = service.consultarStatus();
 
-    assertTrue(resultado.redisDisponivel());
-    assertEquals(3L, resultado.movimentacoesPendentes());
-  }
+        assertTrue(resultado.redisDisponivel());
+        assertEquals(
+            Long.valueOf(3),
+            resultado.movimentacoesPendentes()
+        );
+    }
 
-  @Test
-  void deveInformarRedisIndisponivel() {
-    when(redisTemplate.execute(
-        org.mockito.ArgumentMatchers
-            .<RedisCallback<Boolean>>any()))
-        .thenThrow(new IllegalStateException("Conexão recusada"));
+    @Test
+    void deveInformarRedisIndisponivel() {
+        when(redisTemplate.execute(
+            org.mockito.ArgumentMatchers.<RedisCallback<Boolean>>any()
+        )).thenThrow(new IllegalStateException("Conexão recusada"));
 
-    when(gateway.contarPendentes()).thenReturn(5L);
+        when(gateway.contarPendentes()).thenReturn(5L);
 
-    var resultado = service.consultarStatus();
+        var resultado = service.consultarStatus();
 
-    assertFalse(resultado.redisDisponivel());
-    assertEquals(5L, resultado.movimentacoesPendentes());
-  }
+        assertFalse(resultado.redisDisponivel());
+        assertEquals(
+            Long.valueOf(5),
+            resultado.movimentacoesPendentes()
+        );
+    }
 
-  @Test
-  void deveManterPendenciaQuandoBloqueioNaoForObtido() {
-    when(gateway.buscarIdsPendentes(100))
-        .thenReturn(List.of(1L));
+    @Test
+    void deveManterPendenciaQuandoBloqueioNaoForObtido() {
+        when(gateway.buscarIdsPendentes(100))
+            .thenReturn(List.of(1L));
 
-    when(sincronizacaoService.sincronizar(1L))
-        .thenReturn(false);
+        when(sincronizacaoService.sincronizar(1L))
+            .thenReturn(false);
 
-    when(gateway.contarPendentes()).thenReturn(1L);
+        when(gateway.contarPendentes()).thenReturn(1L);
 
-    var resultado = service.sincronizarPendentes();
+        var resultado = service.sincronizarPendentes();
 
-    assertEquals(0, resultado.sincronizadas());
-    assertEquals(0, resultado.falhas());
-    assertEquals(1L, resultado.pendentesRestantes());
+        assertEquals(1, resultado.processadas());
+        assertEquals(0, resultado.sincronizadas());
+        assertEquals(0, resultado.falhas());
+        assertEquals(Long.valueOf(1), resultado.pendentesRestantes());
 
-    verify(gateway, never()).registrarFalha(anyLong());
-  }
+        verify(gateway, never()).registrarFalha(anyLong());
+    }
+
+    @Test
+    void deveContinuarMesmoQuandoRegistroDaFalhaTambemFalhar() {
+        when(gateway.buscarIdsPendentes(100))
+            .thenReturn(List.of(1L, 2L));
+
+        when(sincronizacaoService.sincronizar(1L))
+            .thenThrow(new IllegalStateException("Redis indisponível"));
+
+        doThrow(new IllegalStateException("Falha no registro"))
+            .when(gateway).registrarFalha(1L);
+
+        when(sincronizacaoService.sincronizar(2L))
+            .thenReturn(true);
+
+        when(gateway.contarPendentes()).thenReturn(1L);
+
+        var resultado = assertDoesNotThrow(
+            service::sincronizarPendentes
+        );
+
+        assertEquals(2, resultado.processadas());
+        assertEquals(1, resultado.sincronizadas());
+        assertEquals(1, resultado.falhas());
+        assertEquals(Long.valueOf(1), resultado.pendentesRestantes());
+
+        verify(gateway).registrarFalha(1L);
+        verify(sincronizacaoService).sincronizar(2L);
+        verify(gateway, never()).registrarFalha(2L);
+    }
+
+    @Test
+    void deveRejeitarTamanhoDeLoteInvalido() {
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RedisAdminService(
+                gateway,
+                sincronizacaoService,
+                redisTemplate,
+                0
+            )
+        );
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new RedisAdminService(
+                gateway,
+                sincronizacaoService,
+                redisTemplate,
+                1001
+            )
+        );
+    }
 }

@@ -14,4 +14,10 @@ public interface PostagemValidacaoGateway {
   void atualizarTrustScore(
       Integer usuarioId,
       Integer condominioId);
+
+  List<Integer> buscarVencidasApos(Integer ultimoId, int limite);
+
+  boolean tentarBloquearFechamento(Integer postagemId);
+
+  boolean janelaVencida(Integer postagemId);
 }

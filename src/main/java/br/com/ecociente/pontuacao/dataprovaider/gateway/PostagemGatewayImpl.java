@@ -11,6 +11,7 @@ import br.com.ecociente.pontuacao.core.gateway.PostagemGateway;
 import br.com.ecociente.pontuacao.dataprovaider.mapper.PostagemMapper;
 import br.com.ecociente.pontuacao.dataprovaider.repository.PostagemRepository;
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityManager;
 
 @Component
 @RequiredArgsConstructor
@@ -19,6 +20,7 @@ public class PostagemGatewayImpl implements PostagemGateway {
 
   private final PostagemRepository repository;
   private final PostagemMapper mapper;
+  private final EntityManager entityManager;
 
   @Override
   public Optional<Integer> buscarUsuarioId(Integer postagemId) {
@@ -35,7 +37,10 @@ public class PostagemGatewayImpl implements PostagemGateway {
   @Transactional(propagation = Propagation.MANDATORY)
   public Optional<Postagem> buscarComBloqueio(Integer postagemId) {
     return repository.buscarComBloqueio(postagemId)
-        .map(mapper::toDomain);
+        .map(entity -> {
+          entityManager.refresh(entity);
+          return mapper.toDomain(entity);
+        });
   }
 
   @Override

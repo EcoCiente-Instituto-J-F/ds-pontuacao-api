@@ -1,4 +1,3 @@
-
 package br.com.ecociente.pontuacao.config.job;
 
 import org.slf4j.Logger;
@@ -19,11 +18,12 @@ public class PostValidationClosingJob {
     private final PostagemValidacaoService service;
     private final int batchSize;
 
+    private int ultimoId = 0;
+
     public PostValidationClosingJob(
             PostagemValidacaoGateway gateway,
             PostagemValidacaoService service,
             @Value("${app.validation.batch-size:100}") int batchSize) {
-
         if (batchSize < 1 || batchSize > 1000) {
             throw new IllegalArgumentException(
                     "O tamanho do lote deve estar entre 1 e 1000");
@@ -35,19 +35,34 @@ public class PostValidationClosingJob {
     }
 
     @Scheduled(fixedDelayString = "${app.validation.delay-ms:60000}")
-    public void executar() {
+    public synchronized void executar() {
+        try {
+            var postagens = gateway.buscarVencidasApos(
+                    ultimoId,
+                    batchSize);
 
-        var postagens = gateway.buscarVencidas(batchSize);
-
-        for (Integer postagemId : postagens) {
-            try {
-                service.encerrar(postagemId);
-            } catch (RuntimeException ex) {
-                log.error(
-                        "Falha ao encerrar postagemId={}",
-                        postagemId,
-                        ex);
+            if (postagens.isEmpty()) {
+                ultimoId = 0;
+                return;
             }
+
+            for (Integer postagemId : postagens) {
+                try {
+                    service.encerrar(postagemId);
+                } catch (RuntimeException exception) {
+                    log.error(
+                            "Falha ao encerrar postagemId={}",
+                            postagemId,
+                            exception);
+                } finally {
+                    ultimoId = postagemId;
+                }
+            }
+        } catch (RuntimeException exception) {
+            log.error(
+                    "Falha ao consultar lote de postagens vencidas ultimoId={}",
+                    ultimoId,
+                    exception);
         }
     }
 }
