@@ -15,7 +15,7 @@ O projeto é em português do Brasil: código de domínio, mensagens de erro, co
    cd ds-pontuacao-api
    ```
 3. Se o seu JDK 21 não estiver em `C:/Program Files/Java/jdk-21.0.12.1`, ajuste `org.gradle.java.home` no `gradle.properties` apenas na sua máquina (não commite essa mudança).
-4. Para rodar a aplicação, crie um `.env` com as variáveis listadas no [README](README.md#instalando) e use `./gradlew bootRun`.
+4. Para rodar a aplicação, copie o `.env.example` para `.env`, preencha as variáveis (veja o [README](README.md#instalando)) e use `./gradlew bootRun`.
 
 ## Testando sua mudança
 

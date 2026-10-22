@@ -60,7 +60,12 @@ git clone https://github.com/EcoCiente-Instituto-J-F/ds-pontuacao-api.git
 cd ds-pontuacao-api
 ```
 
-Crie um arquivo `.env` na raiz (ele é ignorado pelo git e lido pelo Spring via `spring.config.import`) com as variáveis abaixo:
+Copie o `.env.example` para `.env` na raiz (ele é ignorado pelo git e lido pelo Spring via `spring.config.import`) e preencha as variáveis abaixo:
+
+```bash
+cp .env.example .env        # Linux/macOS
+copy .env.example .env      # Windows (cmd)
+```
 
 | Variável | Descrição |
 | --- | --- |
@@ -69,10 +74,11 @@ Crie um arquivo `.env` na raiz (ele é ignorado pelo git e lido pelo Spring via 
 | `DB_USER` / `DB_PASSWORD` | Credenciais do banco |
 | `REDIS_HOST` / `REDIS_PORT` | Endereço do Redis |
 | `REDIS_USERNAME` / `REDIS_PASSWORD` | Credenciais do Redis |
-| `RANKING_CYCLE_EPOCH` | Data de início do primeiro ciclo do ranking |
+| `RANKING_CYCLE_EPOCH` | Data de início do primeiro ciclo do ranking (`yyyy-MM-dd`) |
 | `SERVER_PORT` | (opcional) porta HTTP; o padrão é `9786` |
+| `APP_PORT` | (opcional) porta publicada pelo `docker-compose.yml`; o padrão é `8080` |
 
-> O `.env.example` do repositório hoje só traz `APP_PORT`, usado pelo `docker-compose.yml`.
+Os valores `CHANGEME` do `.env.example` precisam ser trocados antes de rodar.
 
 O `gradle.properties` aponta o JDK para `C:/Program Files/Java/jdk-21.0.12.1`. Se o seu JDK 21 estiver em outro caminho, ajuste `org.gradle.java.home` localmente.
 
