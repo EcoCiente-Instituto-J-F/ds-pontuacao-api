@@ -22,7 +22,7 @@ jobs:
 
     name: Build e testes
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     timeout-minutes: 15
 
@@ -31,14 +31,24 @@ jobs:
       - name: Baixar codigo
         uses: actions/checkout@v7
 
-      - name: Configurar Java 19
+      - name: Configurar Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "19"
+          java-version: "21"
 
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      - name: Verificar Docker para os testes de integracao
+        run: |
+          docker version
+          docker info
+
+      - name: Compatibilidade Testcontainers com Docker Engine recente
+        run: |
+          mkdir -p src/test/resources
+          printf '%s\n' 'api.version=1.44' > src/test/resources/docker-java.properties
 
       - name: Dar permissao ao Gradle Wrapper
         run: chmod +x gradlew
