@@ -8,11 +8,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import br.com.ecociente.pontuacao.core.gateway.SincronizacaoPontuacaoGateway;
 import br.com.ecociente.pontuacao.core.service.SincronizacaoPontuacaoService;
 
 @Component
+@ConditionalOnProperty(name = "app.jobs.enabled", havingValue = "true", matchIfMissing = true)
 public class RedisPendingSyncJob {
 
     private static final Logger log = LoggerFactory.getLogger(RedisPendingSyncJob.class);
