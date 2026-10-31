@@ -5,6 +5,7 @@ from typing import Literal
 
 import requests
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import BaseModel, Field
 
@@ -707,9 +708,18 @@ def main():
         f"Enviando análise para {GEMINI_MODEL}..."
     )
 
-    analysis = analyze_with_gemini(
-        prompt
-    )
+    try:
+        analysis = analyze_with_gemini(
+            prompt
+        )
+    except (genai_errors.ClientError, genai_errors.ServerError) as error:
+        if getattr(error, "status_code", None) in (429, 503):
+            print(
+                "AVISO: Gemini temporariamente indisponivel (cota ou sobrecarga). "
+                "Preservando a descricao atual da PR, sem bloquear a CI."
+            )
+            return
+        raise
 
     print(
         "Análise recebida."
