@@ -56,7 +56,7 @@ class PontuacaoApplicationTests {
 
     @Test
     void contextLoadsWithoutRunningProductionJobs() {
-        assertThat(context).doesNotHaveBean(RedisPendingSyncJob.class);
-        assertThat(context).doesNotHaveBean(PostValidationClosingJob.class);
+        assertThat(context.getBeansOfType(RedisPendingSyncJob.class)).isEmpty();
+        assertThat(context.getBeansOfType(PostValidationClosingJob.class)).isEmpty();
     }
 }
